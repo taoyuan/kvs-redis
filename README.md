@@ -1,5 +1,7 @@
 # kvs-redis
 
+[![Greenkeeper badge](https://badges.greenkeeper.io/taoyuan/kvs-redis.svg)](https://greenkeeper.io/)
+
 > Redis adapter for kvs
 
 ## Installation
