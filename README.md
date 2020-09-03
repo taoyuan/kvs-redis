@@ -11,9 +11,11 @@
 ## Usage
 
 ```typescript
-import {Store} from "kvs";
+import {Store} from 'kvs';
 
-const store = Store.create('redis', {/*...*/});
+const store = Store.create('redis', {
+  /*...*/
+});
 
 (async () => {
   const bucket = await store.createBucket(/*...*/);
