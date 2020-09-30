@@ -89,10 +89,6 @@ export default class Redis implements Adapter {
   protected type?: string;
   protected isHash: boolean;
 
-  static create(options: RedisOptions = {}) {
-    return new Redis(options);
-  }
-
   constructor(options: RedisOptions = {}) {
     this.client = resolveRedisClient(options);
     this.packer = options.packer ?? JSON_PACKER;
