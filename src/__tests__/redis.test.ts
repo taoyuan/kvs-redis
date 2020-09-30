@@ -5,9 +5,10 @@ import {expect} from '@tib/testlab';
 import * as s from './support';
 import {Store, Bucket} from 'kvs';
 import {asyncFromCallback} from '../utils';
+import Redis from '../redis';
 
 const getStore = () =>
-  Store.create('redis', {
+  Store.create(Redis, {
     redis: require('redis-mock'),
   });
 
@@ -34,6 +35,11 @@ describe('redis', function () {
       stubCreateClient = sinon.stub(redis, 'createClient').returns(redisClient);
     });
 
+    after(async () => {
+      stubCreateClient.restore();
+      redisClient.end(true);
+    });
+
     beforeEach(async () => {
       store = getStore();
       bucket = await store.createBucket({
@@ -44,10 +50,8 @@ describe('redis', function () {
       name = s.random.string();
     });
 
-    after(async () => {
-      stubCreateClient.restore();
+    afterEach(async () => {
       await bucket.clear();
-      redisClient.end(true);
     });
 
     it('should calls back with the result of load', async () => {
