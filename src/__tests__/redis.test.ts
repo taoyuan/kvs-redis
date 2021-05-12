@@ -42,7 +42,7 @@ describe('redis', function () {
 
     beforeEach(async () => {
       store = getStore();
-      bucket = await store.createBucket({
+      bucket = store.createBucket({
         // eslint-disable-next-line no-shadow
         load: name => methods.getWidget(name ?? 'unknown'),
       });
@@ -106,7 +106,7 @@ describe('redis', function () {
     context('when using ttl', function () {
       beforeEach(async () => {
         ttl = 50;
-        bucket = await getStore().createBucket({
+        bucket = getStore().createBucket({
           ttl,
           // eslint-disable-next-line no-shadow
           load: name => methods.getWidget(name ?? 'unknown'),
