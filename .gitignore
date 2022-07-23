@@ -1,4 +1,19 @@
+# Cache
+.eslintcache
 .idea
+.npm
+.vscode
+.yarnclean
+
+# Yarn
+.yarn/*
+!.yarn/patches
+!.yarn/releases
+!.yarn/plugins
+!.yarn/sdks
+!.yarn/versions
+.pnp.*
+
 node_modules
 npm-debug.log
 .DS_Store
@@ -7,7 +22,4 @@ coverage
 *.tgz
 .sandbox
 *.tsbuildinfo
-dist
-
-# ESLint cache
-.eslintcache
+dist/*

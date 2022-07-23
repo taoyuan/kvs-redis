@@ -1,8 +1,8 @@
-import {ClientOpts} from 'redis';
-import includes from '@tib/utils/array/includes';
-import isEmpty from '@tib/utils/is/empty';
 import {Adapter} from 'kvs';
-import {asyncFromCallback} from './utils';
+import {RedisClientOptions} from 'redis';
+import {includes} from 'tily/array/includes';
+import {isEmpty} from 'tily/is/empty';
+import {fromCallback} from 'tily/promise/fromCallback';
 
 const DEFAULT_PORT = 6379;
 const DEFAULT_HOST = 'localhost';
@@ -23,13 +23,13 @@ export const JSON_PACKER: Packer = {
 };
 
 export interface RedisStatic {
-  createClient(port: number, host?: string, options?: ClientOpts): any;
+  createClient(port: number, host?: string, options?: RedisClientOptions): any;
 
-  createClient(unix_socket: string, options?: ClientOpts): any;
+  createClient(unix_socket: string, options?: RedisClientOptions): any;
 
-  createClient(redis_url: string, options?: ClientOpts): any;
+  createClient(redis_url: string, options?: RedisClientOptions): any;
 
-  createClient(options?: ClientOpts): any;
+  createClient(options?: RedisClientOptions): any;
 }
 
 export interface RedisOptions {
@@ -45,11 +45,7 @@ export interface RedisOptions {
 }
 
 function isRedisClient(x: any): boolean {
-  return (
-    typeof x === 'function' &&
-    typeof x.multi === 'function' &&
-    typeof x.batch === 'function'
-  );
+  return typeof x === 'function' && typeof x.multi === 'function' && typeof x.batch === 'function';
 }
 
 // options ref: https://www.npmjs.com/package/redis
@@ -100,9 +96,9 @@ export default class Redis implements Adapter {
 
   async get(key: string): Promise<any> {
     if (this.isHash) {
-      return asyncFromCallback(cb => this.client.hgetall(key, cb));
+      return fromCallback(cb => this.client.hgetall(key, cb));
     }
-    const result = await asyncFromCallback(cb => this.client.get(key, cb));
+    const result = await fromCallback(cb => this.client.get(key, cb));
     return this.packer.unpack(result);
   }
 
@@ -110,15 +106,13 @@ export default class Redis implements Adapter {
     ttl = ttl ?? this.ttl;
     let answer: any;
     if (this.isHash) {
-      answer = await asyncFromCallback(cb => this.client.hmset(key, value, cb));
+      answer = await fromCallback(cb => this.client.hmset(key, value, cb));
     } else {
-      answer = await asyncFromCallback(cb =>
-        this.client.set(key, this.packer.pack(value), cb),
-      );
+      answer = await fromCallback(cb => this.client.set(key, this.packer.pack(value), cb));
     }
 
     if (ttl) {
-      await asyncFromCallback(cb => this.client.expire(key, ttl, cb));
+      await fromCallback(cb => this.client.expire(key, ttl, cb));
     }
 
     return answer;
@@ -131,9 +125,7 @@ export default class Redis implements Adapter {
       return old;
     }
 
-    const result: string = await asyncFromCallback(cb =>
-      this.client.getset(key, this.packer.pack(value), cb),
-    );
+    const result: string = await fromCallback(cb => this.client.getset(key, this.packer.pack(value), cb));
     return this.packer.unpack(result);
   }
 
@@ -144,11 +136,11 @@ export default class Redis implements Adapter {
   }
 
   async has(key: string): Promise<number> {
-    return asyncFromCallback(cb => this.client.exists(key, cb));
+    return fromCallback(cb => this.client.exists(key, cb));
   }
 
   async del(key: string): Promise<number> {
-    return asyncFromCallback(cb => this.client.del(key, cb));
+    return fromCallback(cb => this.client.del(key, cb));
   }
 
   /**
@@ -159,7 +151,7 @@ export default class Redis implements Adapter {
    */
   async keys(pattern?: string): Promise<string[]> {
     const patternToUse: string = pattern ?? '*';
-    return asyncFromCallback(cb => this.client.keys(patternToUse, cb));
+    return fromCallback(cb => this.client.keys(patternToUse, cb));
   }
 
   /**
@@ -185,7 +177,7 @@ export default class Redis implements Adapter {
 
   async close(): Promise<void> {
     if (this.client.connected) {
-      await asyncFromCallback(cb => this.client.quit(cb));
+      await fromCallback(cb => this.client.quit(cb));
     }
   }
 }

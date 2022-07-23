@@ -1,6 +1,6 @@
-node_modules
-dist
-coverage
-sandbox
+node_modules/
+dist/
+coverage/
+/sandbox
 **/*.d.ts
-examples
+.eslintrc.js

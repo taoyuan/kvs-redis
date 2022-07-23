@@ -1,11 +1,8 @@
-import redis = require('redis-mock');
-import {SinonStub} from 'sinon';
-import {sinon} from '@tib/testlab/dist/sinon';
-import {expect} from '@tib/testlab';
-import * as s from './support';
-import {Store, Bucket} from 'kvs';
-import {asyncFromCallback} from '../utils';
+import {Bucket, Store} from 'kvs';
+import redis from 'redis-mock';
+import {fromCallback} from 'tily/promise/fromCallback';
 import Redis from '../redis';
+import * as s from './support';
 
 const getStore = () =>
   Store.create(Redis, {
@@ -28,15 +25,15 @@ describe('redis', function () {
 
     let redisClient: any;
 
-    let stubCreateClient: SinonStub;
+    let stubCreateClient: jest.SpyInstance;
 
-    before(function () {
+    beforeAll(function () {
       redisClient = redis.createClient();
-      stubCreateClient = sinon.stub(redis, 'createClient').returns(redisClient);
+      stubCreateClient = jest.spyOn(redis, 'createClient').mockReturnValue(redisClient);
     });
 
-    after(async () => {
-      stubCreateClient.restore();
+    afterAll(async () => {
+      stubCreateClient.mockRestore();
       redisClient.end(true);
     });
 
@@ -56,54 +53,47 @@ describe('redis', function () {
 
     it('should calls back with the result of load', async () => {
       const widget = await bucket.get(key, name);
-      expect(widget).deepEqual({name});
+      expect(widget).toEqual({name});
     });
 
     it('should caches the result of the function in redis', async () => {
       const widget = await bucket.get(key, name);
-      expect(widget).ok();
+      expect(widget).toBeTruthy();
 
-      const result: string = await asyncFromCallback(cb =>
-        redisClient.get(bucket.fullkey(key), cb),
-      );
-      expect(JSON.parse(result)).deepEqual({name});
+      const result: string = await fromCallback(cb => redisClient.get(bucket.fullkey(key), cb));
+      expect(JSON.parse(result)).toEqual({name});
     });
 
-    context('when load function calls back with an error', function () {
+    describe('when load function calls back with an error', function () {
       it("should calls back with that error and doesn't bucket result", async () => {
         const fakeError = new Error(s.random.string());
-        const stubGetWidget = sinon.stub(methods, 'getWidget');
-        stubGetWidget.callsFake(() => {
+        const stubGetWidget = jest.spyOn(methods, 'getWidget').mockImplementation(() => {
           throw fakeError;
         });
 
-        await expect(bucket.get(key, name)).rejectedWith(fakeError.message);
-        const result: string = await asyncFromCallback(cb =>
-          redisClient.get(bucket.fullkey(key), cb),
-        );
-        expect(result).not.ok();
+        await expect(bucket.get(key, name)).rejects.toThrow(fakeError.message);
+        const result: string = await fromCallback(cb => redisClient.get(bucket.fullkey(key), cb));
+        expect(result).toBeFalsy();
 
-        stubGetWidget.restore();
+        stubGetWidget.mockRestore();
       });
     });
 
     it('should retrieves data from redis when available', async () => {
       let widget = await bucket.get(key, name);
-      expect(widget).ok();
+      expect(widget).toBeTruthy();
 
-      const result: string = await asyncFromCallback(cb =>
-        redisClient.get(bucket.fullkey(key), cb),
-      );
-      expect(result).ok();
+      const result: string = await fromCallback(cb => redisClient.get(bucket.fullkey(key), cb));
+      expect(result).toBeTruthy();
 
-      const spyGet = sinon.spy(redisClient, 'get');
+      const spyGet = jest.spyOn(redisClient, 'get');
       widget = await bucket.get(key);
-      expect(widget).deepEqual({name});
-      expect(spyGet.calledWith(bucket.fullkey(key))).ok();
-      spyGet.restore();
+      expect(widget).toEqual({name});
+      expect(spyGet).toBeCalledWith(bucket.fullkey(key), expect.anything());
+      spyGet.mockRestore();
     });
 
-    context('when using ttl', function () {
+    describe('when using ttl', function () {
       beforeEach(async () => {
         ttl = 50;
         bucket = getStore().createBucket({
@@ -119,11 +109,9 @@ describe('redis', function () {
 
       it('expires cached result after ttl seconds', async () => {
         const widget = await bucket.get(key, name);
-        expect(widget).ok();
+        expect(widget).toBeTruthy();
 
-        const result: number = await asyncFromCallback(cb =>
-          redisClient.ttl(bucket.fullkey(key), cb),
-        );
+        const result: number = await fromCallback(cb => redisClient.ttl(bucket.fullkey(key), cb));
         s.assertWithin(result, ttl, 2);
       });
     });

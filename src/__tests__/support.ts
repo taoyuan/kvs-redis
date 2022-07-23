@@ -1,5 +1,3 @@
-import {expect} from '@tib/testlab';
-
 export const random = {
   string(len?: number) {
     len = len ?? 8;
@@ -14,8 +12,8 @@ export const random = {
 };
 
 export function assertBetween(actual: number, lower: number, upper: number) {
-  expect(actual).greaterThanOrEqual(lower);
-  expect(actual).lessThanOrEqual(upper);
+  expect(actual).toBeGreaterThanOrEqual(lower);
+  expect(actual).toBeLessThanOrEqual(upper);
 }
 
 export function assertWithin(actual: number, expected: number, delta: number) {
