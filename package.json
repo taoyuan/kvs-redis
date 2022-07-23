@@ -23,7 +23,7 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "prerelease": "yarn install && cross-env CI=1 yarn test",
-    "release": "yarn prerelease && np --no-2fa --no-cleanup --no-tests",
+    "release": "yarn prerelease && np --no-2fa --no-cleanup --no-tests --no-yarn",
     "build": "nb-tsc -b",
     "build:full": "yarn install && yarn clean && yarn build",
     "lint": "yarn prettier:check && yarn eslint",
