@@ -40,8 +40,7 @@ describe('redis', function () {
     beforeEach(async () => {
       store = getStore();
       bucket = store.createBucket({
-        // eslint-disable-next-line no-shadow
-        load: name => methods.getWidget(name ?? 'unknown'),
+        load: n => methods.getWidget(n ?? 'unknown'),
       });
       key = s.random.string(20);
       name = s.random.string();
@@ -98,8 +97,7 @@ describe('redis', function () {
         ttl = 50;
         bucket = getStore().createBucket({
           ttl,
-          // eslint-disable-next-line no-shadow
-          load: name => methods.getWidget(name ?? 'unknown'),
+          load: n => methods.getWidget(n ?? 'unknown'),
         });
       });
 
