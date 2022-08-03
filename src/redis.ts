@@ -83,6 +83,8 @@ export default class Redis implements Adapter {
     this.type = options.type;
 
     this.isHash = includes(this.type, ['hash', 'map', 'object']);
+
+    this.client.on('error', err => console.error(err));
   }
 
   async get(key: string): Promise<any> {
