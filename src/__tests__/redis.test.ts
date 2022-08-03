@@ -18,6 +18,35 @@ const methods = {
 };
 
 describe('redis', function () {
+  describe('db index', function () {
+    let store: Store;
+    let client: RedisClientType;
+    let bucket: Bucket;
+
+    beforeAll(async () => {
+      store = Store.create(Redis, {
+        url: TestRedisUrl,
+        db: 1,
+      });
+      bucket = store.createBucket('test');
+
+      client = redis.createClient({url: TestRedisUrl});
+      await client.connect();
+      await client.select(1);
+    });
+
+    afterAll(async () => {
+      await client.quit();
+      await store.close();
+    });
+
+    it('should be working with db index', async function () {
+      await bucket.set('foo', 'bar');
+      const value = await client.get('test:foo');
+      expect(value).toBe(JSON.stringify('bar'));
+    });
+  });
+
   describe('Redis adapter get with load', function () {
     let store: Store;
     let bucket: Bucket;
@@ -116,6 +145,11 @@ describe('redis', function () {
 
         const result = await redisClient.ttl(bucket.fullkey(key));
         s.assertWithin(result, ttl, 2);
+      });
+
+      it('should get and set with ttl', async () => {
+        await bucket.set('foo', 'bar');
+        expect(await bucket.get('foo')).toBe('bar');
       });
     });
   });

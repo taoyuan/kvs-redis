@@ -43,7 +43,7 @@ function isRedisClient(x: any): boolean {
 }
 
 // options ref: https://www.npmjs.com/package/redis
-export function resolveRedisClient(options: any | RedisOptions = {}) {
+async function resolveRedisClient(options: any | RedisOptions = {}) {
   if (isRedisClient(options)) {
     return options;
   } else if (isRedisClient(options.client)) {
@@ -59,10 +59,10 @@ export function resolveRedisClient(options: any | RedisOptions = {}) {
 
   const client = redis.createClient(options);
 
-  client
-    .connect()
-    .then(() => db && client.select(db))
-    .catch(err => console.error(err));
+  await client.connect();
+  if (db) {
+    await client.select(db);
+  }
 
   return client;
 }
@@ -70,7 +70,7 @@ export function resolveRedisClient(options: any | RedisOptions = {}) {
 export default class Redis implements Adapter {
   name = 'redis';
 
-  protected client: RedisClientType;
+  protected client: Promise<RedisClientType>;
   protected packer: Packer;
   protected ttl?: number;
   protected type?: string;
@@ -83,42 +83,43 @@ export default class Redis implements Adapter {
     this.type = options.type;
 
     this.isHash = includes(this.type, ['hash', 'map', 'object']);
-
-    this.client.on('error', err => console.error(err));
   }
 
   async get(key: string): Promise<any> {
+    const client = await this.client;
     if (this.isHash) {
-      return this.client.hGetAll(key);
+      return client.hGetAll(key);
     }
-    const result = await this.client.get(key);
+    const result = await client.get(key);
     return this.packer.unpack(result);
   }
 
   async set(key: string, value: any, ttl?: number): Promise<any> {
+    const client = await this.client;
     ttl = ttl ?? this.ttl;
     let answer: any;
     if (this.isHash) {
-      answer = await this.client.hSet(key, value);
+      answer = await client.hSet(key, value);
     } else {
-      answer = await this.client.set(key, this.packer.pack(value));
+      answer = await client.set(key, this.packer.pack(value));
     }
 
     if (ttl) {
-      await this.client.expire(key, ttl);
+      await client.expire(key, ttl);
     }
 
     return answer;
   }
 
   async getset(key: string, value: any): Promise<any> {
+    const client = await this.client;
     if (this.isHash) {
       const old = await this.get(key);
       await this.set(key, value);
       return old;
     }
 
-    const result = await this.client.getSet(key, this.packer.pack(value));
+    const result = await client.getSet(key, this.packer.pack(value));
     return this.packer.unpack(result);
   }
 
@@ -129,11 +130,13 @@ export default class Redis implements Adapter {
   }
 
   async has(key: string): Promise<number> {
-    return this.client.exists(key);
+    const client = await this.client;
+    return client.exists(key);
   }
 
   async del(key: string): Promise<number> {
-    return this.client.del(key);
+    const client = await this.client;
+    return client.del(key);
   }
 
   /**
@@ -143,8 +146,9 @@ export default class Redis implements Adapter {
    * @api public
    */
   async keys(pattern?: string): Promise<string[]> {
+    const client = await this.client;
     const patternToUse: string = pattern ?? '*';
-    return this.client.keys(patternToUse);
+    return client.keys(patternToUse);
   }
 
   /**
@@ -169,8 +173,9 @@ export default class Redis implements Adapter {
   }
 
   async close(): Promise<void> {
-    if (this.client.isOpen) {
-      await this.client.quit();
+    const client = await this.client;
+    if (client.isOpen) {
+      await client.quit();
     }
   }
 }
