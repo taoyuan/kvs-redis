@@ -1,3 +1,5 @@
+export const TestRedisUrl = 'redis://localhost:16379';
+
 export const random = {
   string(len?: number) {
     len = len ?? 8;

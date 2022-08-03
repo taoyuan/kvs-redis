@@ -5,6 +5,8 @@
 .vscode
 .yarnclean
 
+.env
+
 # Yarn
 .yarn/*
 !.yarn/patches

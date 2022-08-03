@@ -1,8 +1,7 @@
 import {Adapter} from 'kvs';
-import {RedisClientOptions} from 'redis';
+import {createClient, RedisClientOptions, RedisClientType} from 'redis';
 import {includes} from 'tily/array/includes';
 import {isEmpty} from 'tily/is/empty';
-import {fromCallback} from 'tily/promise/fromCallback';
 
 const DEFAULT_PORT = 6379;
 const DEFAULT_HOST = 'localhost';
@@ -23,19 +22,14 @@ export const JSON_PACKER: Packer = {
 };
 
 export interface RedisStatic {
-  createClient(port: number, host?: string, options?: RedisClientOptions): any;
-
-  createClient(unix_socket: string, options?: RedisClientOptions): any;
-
-  createClient(redis_url: string, options?: RedisClientOptions): any;
-
-  createClient(options?: RedisClientOptions): any;
+  createClient: typeof createClient;
 }
 
-export interface RedisOptions {
+export interface RedisOptions extends RedisClientOptions {
   redis?: RedisStatic;
   client?: any;
   packer?: Packer;
+  url?: string;
   port?: number;
   host?: string;
   database?: number;
@@ -49,37 +43,34 @@ function isRedisClient(x: any): boolean {
 }
 
 // options ref: https://www.npmjs.com/package/redis
-export function resolveRedisClient(options: any | RedisOptions = {}): any {
+export function resolveRedisClient(options: any | RedisOptions = {}) {
   if (isRedisClient(options)) {
     return options;
   } else if (isRedisClient(options.client)) {
     return options.client;
   }
 
-  const redis = options.redis ?? require('redis');
+  const redis: RedisStatic = options.redis ?? {createClient};
 
-  options.port = options.port ?? DEFAULT_PORT;
-  options.host = options.host ?? DEFAULT_HOST;
+  const port = options.port ?? DEFAULT_PORT;
+  const host = options.host ?? DEFAULT_HOST;
+  options.url = options.url ?? `redis://${host}:${port}`;
   const db = options.database ?? options.db;
 
-  const client = redis.createClient(options.port, options.host, options);
+  const client = redis.createClient(options);
 
-  if (client.connected) {
-    if (db) client.select(db);
-  } else {
-    client.on('connect', function () {
-      if (db) {
-        client.select(db);
-      }
-    });
-  }
+  client
+    .connect()
+    .then(() => db && client.select(db))
+    .catch(err => console.error(err));
+
   return client;
 }
 
 export default class Redis implements Adapter {
   name = 'redis';
 
-  protected client: any;
+  protected client: RedisClientType;
   protected packer: Packer;
   protected ttl?: number;
   protected type?: string;
@@ -96,9 +87,9 @@ export default class Redis implements Adapter {
 
   async get(key: string): Promise<any> {
     if (this.isHash) {
-      return fromCallback(cb => this.client.hgetall(key, cb));
+      return this.client.hGetAll(key);
     }
-    const result = await fromCallback(cb => this.client.get(key, cb));
+    const result = await this.client.get(key);
     return this.packer.unpack(result);
   }
 
@@ -106,13 +97,13 @@ export default class Redis implements Adapter {
     ttl = ttl ?? this.ttl;
     let answer: any;
     if (this.isHash) {
-      answer = await fromCallback(cb => this.client.hmset(key, value, cb));
+      answer = await this.client.hSet(key, value);
     } else {
-      answer = await fromCallback(cb => this.client.set(key, this.packer.pack(value), cb));
+      answer = await this.client.set(key, this.packer.pack(value));
     }
 
     if (ttl) {
-      await fromCallback(cb => this.client.expire(key, ttl, cb));
+      await this.client.expire(key, ttl);
     }
 
     return answer;
@@ -125,7 +116,7 @@ export default class Redis implements Adapter {
       return old;
     }
 
-    const result: string = await fromCallback(cb => this.client.getset(key, this.packer.pack(value), cb));
+    const result = await this.client.getSet(key, this.packer.pack(value));
     return this.packer.unpack(result);
   }
 
@@ -136,11 +127,11 @@ export default class Redis implements Adapter {
   }
 
   async has(key: string): Promise<number> {
-    return fromCallback(cb => this.client.exists(key, cb));
+    return this.client.exists(key);
   }
 
   async del(key: string): Promise<number> {
-    return fromCallback(cb => this.client.del(key, cb));
+    return this.client.del(key);
   }
 
   /**
@@ -151,7 +142,7 @@ export default class Redis implements Adapter {
    */
   async keys(pattern?: string): Promise<string[]> {
     const patternToUse: string = pattern ?? '*';
-    return fromCallback(cb => this.client.keys(patternToUse, cb));
+    return this.client.keys(patternToUse);
   }
 
   /**
@@ -176,8 +167,8 @@ export default class Redis implements Adapter {
   }
 
   async close(): Promise<void> {
-    if (this.client.connected) {
-      await fromCallback(cb => this.client.quit(cb));
+    if (this.client.isOpen) {
+      await this.client.quit();
     }
   }
 }

@@ -1,12 +1,14 @@
 import {Bucket, Store} from 'kvs';
-import redis from 'redis-mock';
-import {fromCallback} from 'tily/promise/fromCallback';
+import * as redis from 'redis';
+import {RedisClientType} from 'redis';
 import Redis from '../redis';
 import * as s from './support';
+import {TestRedisUrl} from './support';
 
 const getStore = () =>
   Store.create(Redis, {
-    redis: require('redis-mock'),
+    redis: require('redis'),
+    url: TestRedisUrl,
   });
 
 const methods = {
@@ -17,31 +19,37 @@ const methods = {
 
 describe('redis', function () {
   describe('Redis adapter get with load', function () {
-    let store;
+    let store: Store;
     let bucket: Bucket;
     let key: string;
     let ttl: number;
     let name: string;
 
-    let redisClient: any;
+    let redisClient: RedisClientType;
 
-    let stubCreateClient: jest.SpyInstance;
+    // let stubCreateClient: jest.SpyInstance;
 
-    beforeAll(function () {
-      redisClient = redis.createClient();
-      stubCreateClient = jest.spyOn(redis, 'createClient').mockReturnValue(redisClient);
-    });
+    beforeAll(async () => {
+      redisClient = redis.createClient({
+        url: TestRedisUrl,
+      });
+      await redisClient.connect();
 
-    afterAll(async () => {
-      stubCreateClient.mockRestore();
-      redisClient.end(true);
-    });
-
-    beforeEach(async () => {
       store = getStore();
       bucket = store.createBucket({
         load: n => methods.getWidget(n ?? 'unknown'),
       });
+    });
+
+    afterAll(async () => {
+      if (redisClient.isOpen) {
+        await redisClient.quit();
+      }
+
+      await store.close();
+    });
+
+    beforeEach(() => {
       key = s.random.string(20);
       name = s.random.string();
     });
@@ -59,7 +67,7 @@ describe('redis', function () {
       const widget = await bucket.get(key, name);
       expect(widget).toBeTruthy();
 
-      const result: string = await fromCallback(cb => redisClient.get(bucket.fullkey(key), cb));
+      const result = (await redisClient.get(bucket.fullkey(key))) as string;
       expect(JSON.parse(result)).toEqual({name});
     });
 
@@ -71,7 +79,7 @@ describe('redis', function () {
         });
 
         await expect(bucket.get(key, name)).rejects.toThrow(fakeError.message);
-        const result: string = await fromCallback(cb => redisClient.get(bucket.fullkey(key), cb));
+        const result = await redisClient.get(bucket.fullkey(key));
         expect(result).toBeFalsy();
 
         stubGetWidget.mockRestore();
@@ -82,14 +90,11 @@ describe('redis', function () {
       let widget = await bucket.get(key, name);
       expect(widget).toBeTruthy();
 
-      const result: string = await fromCallback(cb => redisClient.get(bucket.fullkey(key), cb));
+      const result = (await redisClient.get(bucket.fullkey(key))) as string;
       expect(result).toBeTruthy();
 
-      const spyGet = jest.spyOn(redisClient, 'get');
       widget = await bucket.get(key);
       expect(widget).toEqual({name});
-      expect(spyGet).toBeCalledWith(bucket.fullkey(key), expect.anything());
-      spyGet.mockRestore();
     });
 
     describe('when using ttl', function () {
@@ -109,7 +114,7 @@ describe('redis', function () {
         const widget = await bucket.get(key, name);
         expect(widget).toBeTruthy();
 
-        const result: number = await fromCallback(cb => redisClient.ttl(bucket.fullkey(key), cb));
+        const result = await redisClient.ttl(bucket.fullkey(key));
         s.assertWithin(result, ttl, 2);
       });
     });

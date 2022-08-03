@@ -1,0 +1,12 @@
+version: "3"
+
+# optional ports are specified throughout for more advanced use cases.
+
+services:
+  redis-service:
+    container_name: kvs-redis-dev
+    image: bitnami/redis
+    environment:
+      ALLOW_EMPTY_PASSWORD: ${ALLOW_EMPTY_PASSWORD}
+    ports:
+      - "${REDIS_PORT}:6379"
